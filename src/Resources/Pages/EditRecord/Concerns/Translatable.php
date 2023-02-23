@@ -20,10 +20,15 @@ trait Translatable
             $this->setActiveFormLocale();
         }
 
-        $data = $this->record->attributesToArray();
+        $data = $this->data ?? $this->record->attributesToArray();
 
+        $translatableDataFromSession = session($this->getTranslatableFormDataSessionKey($this->activeFormLocale));
         foreach (static::getResource()::getTranslatableAttributes() as $attribute) {
-            $data[$attribute] = $this->record->getTranslation($attribute, $this->activeFormLocale);
+            if ($translatableDataFromSession) {
+                $data[$attribute] = $translatableDataFromSession[$attribute];
+            } else {
+                $data[$attribute] = $this->record->getTranslation($attribute, $this->activeFormLocale);
+            }
         }
 
         $data = $this->mutateFormDataBeforeFill($data);
@@ -49,11 +54,18 @@ trait Translatable
     {
         $record->fill(Arr::except($data, $record->getTranslatableAttributes()));
 
-        foreach (Arr::only($data, $record->getTranslatableAttributes()) as $key => $value) {
-            $record->setTranslation($key, $this->activeFormLocale, $value);
+        $this->saveTranslatableFormDataInSession($this->data);
+        $translatableDataFromSession = session($this->getTranslatableFormDataSessionKey());
+        foreach ($translatableDataFromSession as $locale => $data) {
+            foreach (Arr::only($data, $record->getTranslatableAttributes()) as $key => $value) {
+                $record->setTranslation($key, $locale, $value);
+            }
         }
 
         $record->save();
+
+        // Deleting current form session data
+        session()->forget($this->getTranslatableFormDataSessionKey());
 
         return $record;
     }
@@ -65,7 +77,7 @@ trait Translatable
 
     public function updatingActiveFormLocale(): void
     {
-        $this->save(shouldRedirect: false);
+        $this->saveTranslatableFormDataInSession($this->data);
     }
 
     protected function getActions(): array
@@ -74,5 +86,34 @@ trait Translatable
             [$this->getActiveFormLocaleSelectAction()],
             parent::getActions(),
         );
+    }
+
+    /**
+     * Get translatable form data session key
+     *
+     * @return string
+     */
+    protected function getTranslatableFormDataSessionKey($locale = null): string
+    {
+        $sessionKey = 'form_translation.' . $this->id;
+
+        if ($locale) {
+            $sessionKey .= '.' . $locale;
+        }
+
+        return $sessionKey;
+    }
+
+    /**
+     * Save translatable form data in session
+     *
+     * @param array $data
+     * @return void
+     */
+    protected function saveTranslatableFormDataInSession(array $data): void
+    {
+        $translatableAttributesData = Arr::only($data, $this->record->getTranslatableAttributes());
+
+        session()->put($this->getTranslatableFormDataSessionKey($this->activeFormLocale), $translatableAttributesData);
     }
 }
