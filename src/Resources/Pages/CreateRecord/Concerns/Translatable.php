@@ -8,43 +8,115 @@ use Illuminate\Support\Arr;
 
 trait Translatable
 {
-    use HasActiveFormLocaleSwitcher;
+	use HasActiveFormLocaleSwitcher;
 
-    public function mount(): void
-    {
-        static::authorizeResourceAccess();
+	public function mount(): void
+	{
+		static::authorizeResourceAccess();
 
-        abort_unless(static::getResource()::canCreate(), 403);
+		abort_unless(static::getResource()::canCreate(), 403);
 
-        $this->setActiveFormLocale();
+		$this->setActiveFormLocale();
 
-        $this->fillForm();
-    }
+		$this->fillForm();
+	}
 
-    protected function setActiveFormLocale(): void
-    {
-        $this->activeLocale = $this->activeFormLocale = static::getResource()::getDefaultTranslatableLocale();
-    }
+	protected function fillForm(): void
+	{
+		$this->callHook('beforeFill');
 
-    protected function handleRecordCreation(array $data): Model
-    {
-        $record = app(static::getModel());
-        $record->fill(Arr::except($data, $record->getTranslatableAttributes()));
+		if ($this->activeFormLocale === null) {
+			$this->setActiveFormLocale();
+		}
+		$data = $this->data ?? [];
 
-        foreach (Arr::only($data, $record->getTranslatableAttributes()) as $key => $value) {
-            $record->setTranslation($key, $this->activeFormLocale, $value);
-        }
+		$translatableDataFromSession = session($this->getTranslatableFormDataSessionKey($this->activeFormLocale));
+		foreach (static::getResource()::getTranslatableAttributes() as $attribute) {
+			if ($translatableDataFromSession) {
+				$data[$attribute] = $translatableDataFromSession[$attribute];
+			} else {
+				$data[$attribute] = null;
+			}
+		}
 
-        $record->save();
+		$data = method_exists($this, 'mutateFormDataBeforeFill') ? $this->mutateFormDataBeforeFill($data) : $data;
 
-        return $record;
-    }
+		$this->form->fill($data);
 
-    protected function getActions(): array
-    {
-        return array_merge(
-            [$this->getActiveFormLocaleSelectAction()],
-            parent::getActions() ?? [],
-        );
-    }
+		$this->callHook('afterFill');
+	}
+
+	protected function setActiveFormLocale(): void
+	{
+		$this->activeLocale = $this->activeFormLocale = static::getResource()::getDefaultTranslatableLocale();
+	}
+
+	protected function handleRecordCreation(array $data): Model
+	{
+		$record = app(static::getModel());
+		$record->fill(Arr::except($data, $record->getTranslatableAttributes()));
+
+		$this->saveTranslatableFormDataInSession($this->data);
+		$translatableDataFromSession = session($this->getTranslatableFormDataSessionKey());
+		foreach ($translatableDataFromSession as $locale => $data) {
+			foreach (Arr::only($data, $record->getTranslatableAttributes()) as $key => $value) {
+				$record->setTranslation($key, $locale, $value);
+			}
+		}
+
+		$record->save();
+
+		// Deleting current form session data
+		session()->forget($this->getTranslatableFormDataSessionKey());
+
+		return $record;
+	}
+
+	public function updatedActiveFormLocale(): void
+	{
+		$this->fillForm();
+	}
+
+	public function updatingActiveFormLocale(): void
+	{
+		$this->saveTranslatableFormDataInSession($this->data);
+	}
+
+	protected function getActions(): array
+	{
+		return array_merge(
+			[$this->getActiveFormLocaleSelectAction()],
+			parent::getActions(),
+		);
+	}
+
+	/**
+	 * Get translatable form data session key
+	 *
+	 * @return string
+	 */
+	protected function getTranslatableFormDataSessionKey($locale = null): string
+	{
+		$sessionKey = 'form_translation.' . $this->id;
+
+		if ($locale) {
+			$sessionKey .= '.' . $locale;
+		}
+
+		return $sessionKey;
+	}
+
+	/**
+	 * Save translatable form data in session
+	 *
+	 * @param array $data
+	 * @return void
+	 */
+	protected function saveTranslatableFormDataInSession(array $data): void
+	{
+		$resource = static::getResource();
+		$translatableAttributesData = Arr::only($data, $resource::getTranslatableAttributes());
+
+		session()->put($this->getTranslatableFormDataSessionKey($this->activeFormLocale), $translatableAttributesData);
+	}
 }
