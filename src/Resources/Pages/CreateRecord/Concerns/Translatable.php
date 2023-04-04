@@ -28,14 +28,18 @@ trait Translatable
 		if ($this->activeFormLocale === null) {
 			$this->setActiveFormLocale();
 		}
-		$data = $this->data ?? [];
+		$data = $this->data;
 
-		$translatableDataFromSession = session($this->getTranslatableFormDataSessionKey($this->activeFormLocale));
-		foreach (static::getResource()::getTranslatableAttributes() as $attribute) {
-			if ($translatableDataFromSession) {
-				$data[$attribute] = $translatableDataFromSession[$attribute];
-			} else {
-				$data[$attribute] = null;
+		if ($data) {
+			// Don't enter this function if "$data == null" (first form load), to load the default values of the fields
+			// If this function is entered on the first form load, the default fields' values will be overridden by an empty value
+			$translatableDataFromSession = session($this->getTranslatableFormDataSessionKey($this->activeFormLocale));
+			foreach (static::getResource()::getTranslatableAttributes() as $attribute) {
+				if ($translatableDataFromSession) {
+					$data[$attribute] = $translatableDataFromSession[$attribute];
+				} else {
+					$data[$attribute] = null;
+				}
 			}
 		}
 
