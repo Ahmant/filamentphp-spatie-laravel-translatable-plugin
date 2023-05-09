@@ -123,4 +123,15 @@ trait Translatable
 
 		session()->put($this->getTranslatableFormDataSessionKey($this->activeFormLocale), $translatableAttributesData);
 	}
+
+	/**
+	 * Called after record created (hook)
+	 *
+	 * @return void
+	 */
+	protected function afterCreate(): void
+	{
+		// Ensure that the form data are cleared (To correctly empty the form after "Create and create another")
+		$this->data = null;
+	}
 }
