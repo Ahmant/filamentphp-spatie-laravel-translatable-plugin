@@ -131,7 +131,10 @@ trait Translatable
 	 */
 	protected function afterCreate(): void
 	{
-		// Ensure that the form data are cleared (To correctly empty the form after "Create and create another")
-		$this->data = null;
+		if ($this->mountedAction == 'createAnother') {
+			// Ensure that the form data are cleared (To correctly empty the form after "Create and create another")
+			$this->data = null;
+		}
+
 	}
 }
