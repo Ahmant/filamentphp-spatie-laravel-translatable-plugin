@@ -24,7 +24,7 @@ trait Translatable
 
         $translatableDataFromSession = session($this->getTranslatableFormDataSessionKey($this->activeFormLocale));
         foreach (static::getResource()::getTranslatableAttributes() as $attribute) {
-            if ($translatableDataFromSession) {
+            if ($translatableDataFromSession && isset($translatableDataFromSession[$attribute])) {
                 $data[$attribute] = $translatableDataFromSession[$attribute];
             } else {
                 $data[$attribute] = $this->record->getTranslation($attribute, $this->activeFormLocale);

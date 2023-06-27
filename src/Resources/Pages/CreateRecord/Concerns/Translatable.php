@@ -35,7 +35,7 @@ trait Translatable
 			// If this function is entered on the first form load, the default fields' values will be overridden by an empty value
 			$translatableDataFromSession = session($this->getTranslatableFormDataSessionKey($this->activeFormLocale));
 			foreach (static::getResource()::getTranslatableAttributes() as $attribute) {
-				if ($translatableDataFromSession) {
+				if ($translatableDataFromSession && isset($translatableDataFromSession[$attribute])) {
 					$data[$attribute] = $translatableDataFromSession[$attribute];
 				} else {
 					$data[$attribute] = null;
