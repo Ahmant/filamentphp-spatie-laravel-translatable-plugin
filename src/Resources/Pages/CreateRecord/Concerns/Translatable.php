@@ -136,5 +136,8 @@ trait Translatable
 			$this->data = null;
 		}
 
+		// Reset the "LocaleSwitcher" after "Create and create another"
+		$this->activeFormLocale = static::getResource()::getDefaultTranslatableLocale();
+		$this->setActiveFormLocale();
 	}
 }
